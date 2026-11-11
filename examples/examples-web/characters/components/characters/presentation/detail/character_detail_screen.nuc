@@ -1,0 +1,41 @@
+// One character, loaded when the screen is shown (a stateful keeps what it loaded between renders).
+@screen(route = "/characters/:id")
+stateful CharacterDetailScreen(id: int)
+  character?: Character
+  error?: string
+
+  initState() void
+    load()
+
+  load() void
+    result: Result<CharacterError, Character> = ~inject<CharactersComponent>().getOne(id)
+    match result
+      Ok(c) -> show(c, null)
+      Err(e) -> show(null, e.message)
+
+  show(loaded: Character?, failure: string?) void
+    setState(() =>
+      character = loaded
+      error = failure
+    )
+
+  build() Element
+    section(
+      className = "detail",
+      children = [
+        button(onClick = () => goBack(), children = "Back"),
+        if error != null p(className = "error", children = error),
+        character != null ? CharacterCard(character = character!) : p(children = "Loading..."),
+      ],
+    )
+
+stateless CharacterCard(character: Character)
+  build() Element
+    article(
+      children = [
+        img(src = character.image, alt = character.name),
+        h2(children = character.name),
+        p(children = "${character.status} · ${character.species} · ${character.gender}"),
+        small(children = "From ${character.origin.name}"),
+      ],
+    )

@@ -1,0 +1,10 @@
+// A page of an API list: always info + results; only the model of each result changes.
+PageInfo
+  count: int
+  pages: int
+  next?: string
+  prev?: string
+
+Page<T>
+  info: PageInfo
+  results: T[]

@@ -1,0 +1,62 @@
+{
+  "name": "dragonfly-web",
+  "version": "0.1.0",
+  "description": "Dragonfly for React: the runtime of NuclearLang's react dialect (http repositories, state managers, events, session, router, tests)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "react": ">=19",
+    "react-dom": ">=19",
+    "react-router": ">=7",
+    "vitest": ">=3",
+    "@testing-library/react": ">=16"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    },
+    "@testing-library/react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "jsdom": "^28.1.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router": "^7.18.5",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.12"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nuclearlang/dragonfly-web.git",
+    "directory": "packages/dragonfly-web"
+  },
+  "homepage": "https://nuclearlang.github.io",
+  "bugs": {
+    "url": "https://github.com/nuclearlang/dragonfly-web/issues"
+  }
+}

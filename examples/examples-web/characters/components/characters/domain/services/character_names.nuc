@@ -1,0 +1,4 @@
+// A domain service: rules the use cases share.
+service CharacterNames
+  alive(characters: Character[]) Character[]
+    characters.filter((c) => c.status == "Alive")

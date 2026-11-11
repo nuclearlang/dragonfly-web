@@ -1,0 +1,501 @@
+# Editor documentation of the react dialect (Dragonfly for React): what the editor and `nuclear help <word>
+# --dialect react` show for each kind and decorator. Rules: spec/web.md (the platform) and spec/react.md.
+
+[kinds]
+
+stateless = '''
+A **React component** without state of its own: its parameters are the props, `build()` returns the elements.
+
+```nuclear
+stateless CharacterTile(character: Character)
+  build() Element
+    li(
+      className = "tile",
+      onClick = () => goTo(CharacterDetailScreen, id = character.id),
+      children = [img(src = character.image, alt = character.name), span(children = character.name)],
+    )
+```
+
+- Elements are made with the HTML functions (`div`, `ul`, `li`, `button`, `input`, `img`... with the attributes
+  as named arguments and `children`) and other views called like functions: `CharacterTile(character = c)`.
+- `@screen(route = "/path/:id", providers = [Manager])` makes it a screen of the router.
+- Inside a screen's views, `Manager.method()` is the provided manager.
+'''
+
+stateful = '''
+A **React component with state**: its fields live while the component is shown; `setState(() => ...)` changes
+them and re-renders. `initState()` runs once when it is shown, `dispose()` when it leaves.
+
+```nuclear
+stateful Counter(start: int = 0)
+  count: int = 0
+
+  initState() void
+    count = start
+
+  build() Element
+    button(onClick = () => setState(() => count = count + 1), children = "Clicked ${count}")
+```
+'''
+
+appConfig = '''
+The **configuration of the whole app** (in `config/`): its connections and its global services.
+
+```nuclear
+appConfig ProjectConfig
+  connections: Connection[] = [
+    Http(baseUrl = "https://api.example.com/", timeout = 5000),
+  ]
+  globals: Global[] = [
+    SessionManager(timeout = 1800000),
+    Acl(inherits = {"admin": ["fan"]}),
+  ]
+```
+
+- `Http(baseUrl, headers, timeout, interceptors)` is a fetch connection; `connectionName` tells two apart.
+- `index.ts` (generated) starts it before mounting the `App` of `main.nuc`.
+'''
+
+config = '''
+The **configuration of one component** (in `components/<c>/config/`): connections and services only that
+component uses.
+
+```nuclear
+config CharactersConfig
+  connections: Connection[] = [
+    Http(connectionName = "images", baseUrl = "https://images.example.com/"),
+  ]
+```
+'''
+
+repository = '''
+The **http calls** of a component (in `data/`). Each method **without a body** and with a verb decorator is one
+request (fetch); its return type says how the response is decoded.
+
+```nuclear
+@repository(path = "character")
+repository CharacterRepository
+  @get(path = ":id")
+  getOne(id: int) Result<CharacterError, Character>
+
+  @get(cache = true, ttl = 600000)
+  getPage(page: int) Result<CharacterError, Page<Character>>
+
+  @post(retry = 1)
+  save(character: CharacterParams) Result<CharacterError, Character>
+```
+
+- The path is added to the connection's `baseUrl`; `:id` takes the parameter of that name; the other parameters go to
+  the query (GET, DELETE) or the JSON body (POST, PUT, PATCH).
+- A `Result` method answers `Err(E(message = ...))` on a failure; another return type throws `HttpError`.
+- `cache = true` keeps the answer `ttl` milliseconds (`purge<Method>()` forgets it); GET, PUT and DELETE retry
+  transient failures twice by themselves, `retry = n` adds attempts to the others.
+- Only a `usecase` or an `aggregate` may use it (`N0301`).
+'''
+
+usecase = '''
+One **business operation**: a class with `exec(...)` that returns `Result`. Its dependencies are the constructor
+parameters, given by the injector.
+
+```nuclear
+usecase GetPageUseCase
+  (repository: CharacterRepository, names: CharacterNames)
+
+  @requires(internet = true)
+  exec(page: int) Result<CharacterError, Character[]>
+    data = ~repository.getPage(page)
+    Ok(names.alive(data.results))
+```
+
+Only its `appcomponent` may call it (`N0301`).
+'''
+
+appcomponent = '''
+The **facade of a component**: the only thing other components and the screens see. Each line gives a name to a
+use case's `exec`.
+
+```nuclear
+appcomponent CharactersComponent
+  getOne() = GetOneCharacterUseCase.exec
+  getPage() = GetPageUseCase.exec
+```
+
+`inject<CharactersComponent>().getPage(1)` from a view; `characters.getPage(1)` from a manager that receives it.
+'''
+
+service = '''
+A **domain service**: helpers the use cases share (mapping, rules on values).
+
+```nuclear
+service CharacterNames
+  alive(characters: Character[]) Character[]
+    characters.filter((c) => c.status == "Alive")
+```
+'''
+
+aggregate = '''
+A **business aggregate**: rules several use cases share, with its own dependencies.
+
+```nuclear
+aggregate Cart(items: ItemRepository)
+  total() double
+    ...
+```
+'''
+
+statemanager = '''
+The **state of a screen**: a `StateManager` whose methods emit the states of its state model.
+
+```nuclear
+@stateModel(CharactersState)
+statemanager CharactersManager
+  (characters: CharactersComponent)
+    loadPage(1)
+
+  @state(CharactersState.loading)
+  loading()
+
+  @before(loading)
+  @state(CharactersState.full)
+  loadPage(page: int) Result<CharacterError, Character[]>
+    ~characters.getPage(page)
+```
+
+A screen gets it with `@screen(providers = [CharactersManager])` and reads it with `CharactersStateBuilder(...)`.
+'''
+
+statemodel = '''
+A **state model** (in `state_models/`): each parameter is a state of the screen; a boolean carries no data.
+
+```nuclear
+CharactersState
+  (full: Character[], error: CharacterError, loading: boolean)
+```
+
+Gives `CharactersState.initial()`, `.full(list)`, `.error(e)`, `.loading()` and the component
+`CharactersStateBuilder(full = (list) => ..., error = (e) => ..., loading = () => ..., orElse = () => ...)`.
+'''
+
+model = '''
+A **domain model**: only its fields. Nuclear writes the immutable class, `fromJson`/`toJson` and `copyWith`. No
+header word is needed in `domain/models/` or `shared/models/`.
+
+```nuclear
+Character
+  id: int
+  name: string
+  @key("origin_name")
+  originName: string
+  episode: string[]
+```
+
+`Character(id = 1, name = "Rick", ...)` builds one; `@key("json_name")` names a field in the JSON.
+'''
+
+component = '''
+A **global component** (in `shared/components/`): a cross-cutting use case; a method with `@on(Event)` runs with
+every event of that class.
+
+```nuclear
+component ForceLogoutComponent
+  (session: SessionManager)
+
+  @on(ForceLogout)
+  exec(event: ForceLogout) void
+    ~session.destroy()
+```
+'''
+
+guard = '''
+A **custom access check** (in `shared/guards/`), like NestJS `CanActivate`: `canActivate()` says whether the
+caller may go on; used in `@acl(guards = [Name])`.
+
+```nuclear
+guard PremiumGuard
+  (session: SessionManager)
+
+  canActivate() boolean
+    session.value<boolean>("premium") != false
+```
+'''
+
+event = '''
+A **global event** (in `shared/events/`): published with `Events.publish(ForceLogout(reason = "expired"))`, received
+by a `component` with `@on(ForceLogout)` or by a view with `useEvent(ForceLogout)`.
+
+```nuclear
+event ForceLogout
+  reason?: string
+```
+'''
+
+tests = '''
+A **test suite** (vitest + jsdom, in `test/`): the app starts with its real config and every request is canned;
+`@mock([Class])` replaces a class with a mock; `beforeEach()` / `afterEach()` methods are the hooks.
+
+```nuclear
+@mock([CharacterRepository])
+CharactersTest
+  beforeEach()
+    when(CharacterRepository.getPage).thenReturn(Ok(page()))
+
+  @test("GetPageUseCase keeps only the alive characters")
+  aliveOnly()
+    result = ~GetPageUseCase.exec(1)
+    expect(okOf(result)).toEqual([character("Rick", "Alive")])
+
+  @widget("the list shows the alive characters")
+  showsList()
+    renderScreen(CharacterListScreen())
+    ~screen.findByText("Rick")
+```
+
+`DragonflyTest.respondWith(json)` answers every request; `okOf(result)` / `errOf(result)` unwrap a `Result`.
+'''
+
+[decorators]
+
+repository = '''
+On a `repository`: `path` (added to the connection's `baseUrl`) and `connection` (the `connectionName` to use).
+
+```nuclear
+@repository(path = "character", connection = "api")
+repository CharacterRepository
+```
+'''
+
+get = '''
+A **GET** method of a `repository`. Arguments: `path` (`:name` takes a parameter), `headers`, `cache = true`,
+`cacheKey`, `ttl` (milliseconds, default 5 minutes), `retry`.
+
+```nuclear
+@get(path = ":id")
+getOne(id: int) Result<CharacterError, Character>
+```
+'''
+
+post = '''
+A **POST** method of a `repository`: the parameters not in the path are the JSON body. `retry = n` repeats a
+transient failure (off by default: a repeated write can duplicate).
+
+```nuclear
+@post(retry = 1)
+save(character: CharacterParams) Result<CharacterError, Character>
+```
+'''
+
+put = '''
+A **PUT** method of a `repository` (the body is the parameters not in the path; retried twice by itself).
+
+```nuclear
+@put(path = ":id")
+replace(id: int, character: CharacterParams) Result<CharacterError, Character>
+```
+'''
+
+patch = '''
+A **PATCH** method of a `repository`.
+
+```nuclear
+@patch(path = ":id")
+rename(id: int, name: string) Result<CharacterError, Character>
+```
+'''
+
+delete = '''
+A **DELETE** method of a `repository`.
+
+```nuclear
+@delete(path = ":id")
+remove(id: int) Result<CharacterError, void>
+```
+'''
+
+path = '''
+On a parameter of a repository method: it goes **in the path** (`:name`), even for a POST.
+
+```nuclear
+@get(path = ":ids")
+getMany(@path ids: string) Character[]
+```
+'''
+
+query = '''
+On a parameter of a repository method: it goes **in the query**, even for a POST.
+
+```nuclear
+@post
+create(character: CharacterParams, @query dryRun: boolean) Result<CharacterError, Character>
+```
+'''
+
+body = '''
+On a parameter of a repository method: it is **the body**, even for a GET.
+
+```nuclear
+@get(path = "search")
+search(@body filters: Filters) Character[]
+```
+'''
+
+stateModel = '''
+On a `statemanager`: its **state model** (the states it emits). The manager starts in `Model.initial()`.
+
+```nuclear
+@stateModel(CharactersState)
+statemanager CharactersManager
+```
+'''
+
+state = '''
+On a method of a `statemanager`: the method's value is **emitted as that state**. A `Result` that fails emits
+the `error` state. Without a body, it emits the state with its parameters.
+
+```nuclear
+@state(CharactersState.loading)
+loading()
+
+@state(CharactersState.full)
+loadPage(page: int) Result<CharacterError, Character[]>
+  ~characters.getPage(page)
+```
+'''
+
+before = '''
+On a method of a `statemanager`: calls another method **before** this one (usually the `loading` state).
+
+```nuclear
+@before(loading)
+@state(CharactersState.full)
+loadPage(page: int) Result<CharacterError, Character[]>
+  ~characters.getPage(page)
+```
+'''
+
+after = '''
+On a method of a `statemanager`: calls another method **after** this one.
+
+```nuclear
+@after(track)
+@state(CartState.full)
+add(item: Item) Result<CartError, Item[]>
+  ~cart.add(item)
+```
+'''
+
+screen = '''
+Makes a `stateless` or `stateful` a **screen** of the router: its route, the managers it creates and who may
+open it.
+
+```nuclear
+@screen(
+  route = "/characters/:id",
+  providers = [CharacterManager],
+  loggedIn = { forward: "/login" },
+  acl = { roles: ["fan"], forward: "/denied" },
+)
+stateful CharacterDetailScreen(id: int)
+```
+
+| Argument | Does |
+|---|---|
+| `route = "/users/:id"` | a route; `:id` is a parameter of the screen (converted to its type), the others come from the query |
+| `providers = [Manager]` | creates those managers for the screen; `Manager.x()` inside its views uses them |
+| `loggedIn = { forward: "/login" }` | without a session, the router goes to that path |
+| `acl = { roles, permissions, forward }` | the session must pass the rule, or the router goes to `forward` |
+| `notFound = true` | the screen for an address no route has |
+
+Navigate with the screen, not the address: `goTo(UserScreen, id = 7)`, `goBack()`.
+'''
+
+on = '''
+On a method of a global `component`: the method runs with **every event** of that class, wherever the user is.
+
+```nuclear
+@on(ForceLogout)
+exec(event: ForceLogout) void
+  ~session.destroy()
+```
+'''
+
+requires = '''
+On the `exec` of a `usecase`: what must hold **before** it runs; otherwise it returns `Err` without running.
+
+```nuclear
+@requires(internet = true, session = true)
+exec(id: int) Result<OrderError, Order>
+```
+
+| Argument | Checks |
+|---|---|
+| `internet = true` | the browser is online |
+| `session = true` | there is an active session (`SessionManager`) |
+'''
+
+acl = '''
+On the `exec` of a `usecase`: the session must pass this access rule; otherwise it returns `Err` without running.
+
+```nuclear
+@acl(roles = ["admin"], permissions = ["orders.write"], guards = [PremiumGuard])
+exec(order: Order) Result<OrderError, Order>
+```
+
+`roles`: one of them (or a role that inherits it, `Acl(inherits = ...)`); `permissions`: all of them; `guards`:
+each `canActivate()` is true (only in a use case that awaits something).
+'''
+
+mock = '''
+On a `tests` group: those classes are **mocks** in the injector; `when(Class.method).thenReturn(value)` prepares an
+answer, `verify(Class.method).called(n)` counts the calls.
+
+```nuclear
+@mock([CharacterRepository])
+CharactersTest
+  beforeEach()
+    when(CharacterRepository.getPage).thenReturn(Ok(page()))
+```
+'''
+
+test = '''
+A **unit test** in a `tests` group. The argument is its description.
+
+```nuclear
+@test("a failed request is an error of the component")
+failure()
+  when(CharacterRepository.getPage).thenReturn(Err(CharacterError(message = "down")))
+  expect(errOf(~CharactersComponent.getPage(2))).toEqual(CharacterError(message = "down"))
+```
+'''
+
+widget = '''
+A **component test**: renders a screen in a memory router (`renderScreen`) and looks at the page with
+`screen.findByText(...)` (Testing Library).
+
+```nuclear
+@widget("the list shows the alive characters")
+showsList()
+  renderScreen(CharacterListScreen())
+  ~screen.findByText("Rick")
+```
+'''
+
+states = '''
+A **statemanager test**: the parameter is the manager (from the injector), the body is what it does and `expect`
+the states it emits, in order.
+
+```nuclear
+@states("loads the page", expect = [CharactersState.loading(), CharactersState.full([rick])])
+loadsPage(manager: CharactersManager)
+  ~manager.loadPage(1)
+```
+'''
+
+key = '''
+On a field of a `model` or an `event`: its **name in the JSON**.
+
+```nuclear
+Character
+  @key("origin_name")
+  originName: string
+```
+'''

@@ -1,0 +1,14 @@
+Origin
+  name: string
+  url: string
+
+Character
+  id: int
+  name: string
+  status: string
+  species: string
+  gender: string
+  origin: Origin
+  image: string
+  episode: string[]
+  created: string

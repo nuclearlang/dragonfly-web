@@ -1,0 +1,16 @@
+// The list of characters: its state comes from CharactersManager, provided to this screen.
+@screen(route = "/", providers = [CharactersManager])
+stateless CharacterListScreen
+  build() Element
+    main(
+      className = "characters",
+      children = [
+        h1(children = "Characters"),
+        CharactersStateBuilder(
+          loading = () => p(children = "Loading..."),
+          full = (characters) => ul(children = characters.map((c) => CharacterTile(key = c.id, character = c))),
+          error = (e) => p(className = "error", children = e.message),
+        ),
+        button(onClick = () => CharactersManager.loadPage(2), children = "Next page"),
+      ],
+    )

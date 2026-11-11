@@ -1,0 +1,10 @@
+// The platform this project is written for and the dialect it is built with (ADR-0093, ADR-0097).
+dragonfly(platform = "web", dialect = "react")
+
+// The project's package.json: dragonfly writes build/app/package.json from it (react, react-router, vite,
+// vitest and dragonfly-web are added by itself).
+app(
+  name = "characters",
+  description = "Dragonfly web example: the characters of an API, their state and tests.",
+  version = "1.0.0",
+)

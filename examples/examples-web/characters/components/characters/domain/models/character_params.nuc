@@ -1,0 +1,5 @@
+// What the API takes to create a character.
+CharacterParams
+  name: string
+  status: string
+  species: string

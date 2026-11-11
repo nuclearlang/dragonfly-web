@@ -1,0 +1,46 @@
+# The web platform: the react dialect against its example and golden, the runtime, a Vite build.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: nuclearlang/nuclear
+          path: nuclear
+      - uses: actions/checkout@v4
+        with:
+          path: nuclear/dragonfly-web
+      - name: The other repositories of the working tree
+        run: |
+          git clone --depth 1 https://github.com/nuclearlang/dragonfly nuclear/dragonfly
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Node tools of the checks
+        run: cd nuclear/tools/node && npm ci --no-audit --no-fund
+      - name: "The dialect: example and golden"
+        working-directory: nuclear
+        run: |
+          cargo test
+      - name: "The spec's equivalences"
+        working-directory: nuclear
+        run: |
+          python3 tools/spec-check/check.py dragonfly-web/spec/react.md react typescript
+      - name: "tsc, the tests, vite build"
+        working-directory: nuclear
+        run: |
+          sh dragonfly-web/tools/react-check/check.sh

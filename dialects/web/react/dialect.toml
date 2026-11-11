@@ -1,0 +1,314 @@
+# react dialect: Dragonfly for React (spec/react.md, ADR-0097).
+# The web platform's architecture (components, use cases, an appcomponent facade, http repositories, state managers,
+# screens with routes, events, guards, tests) on React 19 + React Router 7, built by Vite, tested by Vitest.
+# No JSX: a view is a class with build() that returns elements made with div(...), button(...) (dragonfly-web/html)
+# and createElement(Component, props); the runtime is packages/dragonfly-web.
+
+[dialect]
+name = "react"
+platform = "web"
+extends = "typescript"
+description = "Dragonfly for React: screens, state managers, http repositories, use cases, events and tests written for you"
+# type definitions (spec/definitions.md): generated from the .d.ts by tools/defs/typescript (defs/typescript/)
+defs = [
+  "typescript@5.9.3",
+  "dragonfly-web@0.1.0",
+  "react@19.3.1",
+  "react_router@7.18.5",
+  "vitest@4.1.12",
+  "testing_library_react@16.3.3",
+]
+# the runtime re-exports what a view needs from react; `Element` is the runtime's alias (ReactElement | null)
+replaces = ["auto_imports.createElement", "auto_imports.useState", "auto_imports.useEffect", "auto_imports.useMemo", "auto_imports.useRef", "auto_imports.useCallback", "auto_imports.Fragment"]
+
+[syntax]
+# Vite and Vitest resolve a relative import without an extension (TypeScript's `bundler` resolution)
+project_import = "{{relative}}"
+
+[options]
+builtin_result = false             # Result, Ok and Err are the runtime's (dragonfly-web)
+type_args_as_args = ["inject"]     # inject<Repo>() → inject(Repo): the class is the token
+
+[types]
+Error = "AppError"
+DateTime = "Date"
+
+[names]
+written = ["Result", "Ok", "Err", "AppError", "AppConfig", "ComponentConfig", "Repository", "HttpMethod", "Decode",
+  "Cache", "Json", "StateManager", "StatelessView", "StatefulView", "statelessOf", "statefulOf", "Providers",
+  "useManager", "useStateOf", "createElement", "Element", "inject", "register", "Guards", "Guard", "AppEvent",
+  "Events", "Dragonfly", "buildRouter", "AnyRoute", "DragonflyTest", "describe", "test", "beforeEach", "expect",
+  "when", "verify", "renderScreen", "statesOf", "okOf", "errOf", "screen", "act"]
+
+[decorators]
+# read by the templates (decor) and not written as TypeScript decorators
+consumed = [
+  "repository", "get", "post", "put", "patch", "delete", "path", "query", "body",
+  "stateModel", "state", "before", "after", "screen", "on", "requires", "acl",
+  "mock", "test", "widget", "states",
+  "key",
+]
+# a method with @state returns nothing to its caller: its value becomes a state
+void = ["state"]
+
+# objects provided to a declaration: with @screen(providers = [CharactersManager]) on a screen,
+# CharactersManager.load() is that screen's manager (a hook, called in build)
+[decorators.provide]
+"screen.providers" = "this.manager({{name}})"
+
+# the arguments of each decorator (N0217); `!` = required, `a.b` = field of object a
+[decorators.args]
+screen = ["route", "providers", "loggedIn", "loggedIn.forward!", "acl", "acl.roles", "acl.permissions", "acl.guards", "acl.forward!", "notFound"]
+requires = ["internet", "session"]
+acl = ["roles", "permissions", "guards"]
+
+# --- views ---
+# stateless Name(params) + build() Element → a function component over a StatelessView class (props = params)
+[kinds.stateless]
+description = "stateless Name(params) + build() Element → a React component (a StatelessView built on every render); @screen(route, providers, loggedIn, acl) makes it a screen"
+inherits = ["StatelessView"]
+imports = ["StatelessView", "statelessOf", "createElement", "Element"]
+requires = ["build"]
+named_params = true
+param_access = "this.props.{{name}}"
+# a view inside a screen reads the managers the screen provides (`SearchManager.find(q)` in the screen's views)
+provide = { template = "this.manager({{name}})", kinds = ["statemanager"] }
+template = { file = "templates/stateless.tpl" }
+[kinds.stateless.syntax]
+construct = "{{callee}}({{args}})"     # a view is a function: CharacterTile({ character }) makes its element
+
+# stateful Name(params) + fields + build() → the instance (its fields) lives while the component is shown;
+# setState(() => ...) re-renders
+[kinds.stateful]
+description = "stateful Name(params) + fields + build() Element → a React component whose fields live between renders (StatefulView: setState, initState, dispose); @screen as in stateless"
+inherits = ["StatefulView"]
+imports = ["StatefulView", "statefulOf", "createElement", "Element"]
+requires = ["build"]
+named_params = true
+param_access = "this.props.{{name}}"
+# a view inside a screen reads the managers the screen provides (`SearchManager.find(q)` in the screen's views)
+provide = { template = "this.manager({{name}})", kinds = ["statemanager"] }
+template = { file = "templates/stateful.tpl" }
+[kinds.stateful.syntax]
+construct = "{{callee}}({{args}})"
+# an optional field starts null (the dialect's nullable type is `T | null`)
+field = "{{#override}}override {{/override}}{{name}}{{#type}}: {{type}}{{#optional}} | null{{/optional}}{{/type}}{{#default}} = {{default}}{{/default}}{{^default}}{{#optional}} = null{{/optional}}{{/default}};"
+
+# --- configuration ---
+[kinds.appConfig]
+description = "appConfig Name + connections / globals → the project config (AppConfig)"
+inherits = ["AppConfig"]
+imports = ["AppConfig"]
+template = { file = "templates/appconfig.tpl" }
+[kinds.appConfig.syntax]
+field = "{{#override}}override {{/override}}readonly {{name}}{{#type}}: {{type}}{{/type}}{{#default}} = {{default}}{{/default}};"
+
+[kinds.config]
+description = "config Name + connections / globals → the config of one component (ComponentConfig)"
+inherits = ["ComponentConfig"]
+imports = ["ComponentConfig"]
+template = { file = "templates/config.tpl" }
+[kinds.config.syntax]
+field = "{{#override}}override {{/override}}readonly {{name}}{{#type}}: {{type}}{{/type}}{{#default}} = {{default}}{{/default}};"
+
+# --- data ---
+[kinds.repository]
+description = "@repository(path, connection) repository Name + @get/@post/... methods without body → http calls (fetch) with cache and retries"
+inherits = ["Repository"]
+imports = ["Repository", "HttpMethod", "Decode", "Cache"]
+async_methods = true
+template = { file = "templates/repository.tpl" }
+[kinds.repository.syntax]
+method_signature = { file = "templates/repository_method.tpl" }
+
+# --- domain ---
+[kinds.usecase]
+description = "usecase Name(deps) + exec(...) Result<E, T> → one business operation"
+imports = ["Guards", "Err"]
+methods = ["exec"]
+returns = "Result"
+template = { file = "templates/injectable.tpl" }
+[kinds.usecase.syntax]
+ctor_param = "{{decorators}}private readonly {{name}}{{#optional}}?{{/optional}}{{#type}}: {{type}}{{/type}}{{#default}} = {{default}}{{/default}}"
+method = { file = "templates/usecase_method.tpl" }
+
+[kinds.appcomponent]
+description = "appcomponent Name + aliases to use cases (getOne() = GetOneUseCase.exec) → the facade of a component"
+imports = ["inject"]
+alias_via = "inject"
+template = { file = "templates/injectable.tpl" }
+
+[kinds.service]
+description = "service Name(deps) + methods → helpers of the use cases (mapping, transformations)"
+template = { file = "templates/injectable.tpl" }
+[kinds.service.syntax]
+ctor_param = "{{decorators}}private readonly {{name}}{{#optional}}?{{/optional}}{{#type}}: {{type}}{{/type}}{{#default}} = {{default}}{{/default}}"
+
+[kinds.aggregate]
+description = "aggregate Name(deps) + methods → business rules several use cases share"
+template = { file = "templates/injectable.tpl" }
+[kinds.aggregate.syntax]
+ctor_param = "{{decorators}}private readonly {{name}}{{#optional}}?{{/optional}}{{#type}}: {{type}}{{/type}}{{#default}} = {{default}}{{/default}}"
+
+# global component (shared/components): a method with @on(Event) runs with every event of that class
+[kinds.component]
+description = "component Name(deps) + methods; @on(Event) methods run on every event → a global component (shared/components)"
+template = { file = "templates/injectable.tpl" }
+[kinds.component.syntax]
+ctor_param = "{{decorators}}private readonly {{name}}{{#optional}}?{{/optional}}{{#type}}: {{type}}{{/type}}{{#default}} = {{default}}{{/default}}"
+
+[kinds.guard]
+description = "guard Name(deps) + canActivate() boolean → a custom access check (Guard)"
+inherits = ["Guard"]
+imports = ["Guard"]
+methods = ["canActivate"]
+template = { file = "templates/guard.tpl" }
+[kinds.guard.syntax]
+ctor_param = "{{decorators}}private readonly {{name}}{{#optional}}?{{/optional}}{{#type}}: {{type}}{{/type}}{{#default}} = {{default}}{{/default}}"
+
+# --- state ---
+[kinds.statemanager]
+description = "@stateModel(S) statemanager Name(deps) + @state methods → the state of a screen (StateManager<S>)"
+inherits = ["StateManager"]
+imports = ["StateManager"]
+template = { file = "templates/statemanager.tpl" }
+[kinds.statemanager.syntax]
+constructor = """
+constructor({{params}}) {
+  super({{owner_decor.stateModel.arg}}.initial());{{#body}}
+  {{body}}{{/body}}
+}"""
+ctor_param = "{{decorators}}private readonly {{name}}{{#optional}}?{{/optional}}{{#type}}: {{type}}{{/type}}{{#default}} = {{default}}{{/default}}"
+method = { file = "templates/statemanager_method.tpl" }
+method_signature = { file = "templates/statemanager_signature.tpl" }
+
+[kinds.statemodel]
+description = "Name(field: T, flag: boolean) in state_models/ → states + Name.field(...) constructors + NameBuilder (a component with one builder per state)"
+imports = ["useStateOf", "createElement", "Element"]
+declares = ["{{name}}Builder", "{{name}}Status"]
+template = { file = "templates/statemodel.tpl" }
+[kinds.statemodel.syntax]
+construct = "{{callee}}({{args}})"     # CharactersStateBuilder({ full: ... }) is a function too
+
+# --- models and events ---
+[kinds.model]
+description = "Name + fields in domain/models → an immutable class with fromJson/toJson/copyWith; @key(\"json_name\") names a field in the JSON"
+imports = ["Json"]
+template = { file = "templates/model.tpl" }
+
+[kinds.event]
+description = "event Name + fields → a global event (AppEvent) with fromJson/toJson"
+imports = ["AppEvent", "Json"]
+template = { file = "templates/event.tpl" }
+
+# --- tests (vitest + jsdom) ---
+[kinds.tests]
+description = "@mock([Repository]) tests Name + @test/@widget/@states methods → a vitest suite with the app started; beforeEach()/afterEach() methods are the hooks"
+template = { file = "templates/tests.tpl" }
+results = "keep"
+void_methods = true
+provide = { template = "inject({{name}})", kinds = ["repository", "usecase", "appcomponent", "service", "aggregate", "statemanager"] }
+imports = ["DragonflyTest", "dragonflyConfig", "registerDragonfly", "describe", "test", "beforeEach", "expect", "inject", "statesOf"]
+[kinds.tests.syntax]
+method = { file = "templates/tests_method.tpl" }
+
+# what the dragonfly CLI runs in build/app (ADR-0072): install the runtime and the app, run it, test it
+[toolchain]
+# then Vite's dependency cache goes: it would keep serving the runtime it pre-bundled before (same version, new code)
+install = "npm install {{packages}}/dragonfly-web && npm install && node -e \"require('fs').rmSync('node_modules/.vite', { recursive: true, force: true })\""
+run = "npm run dev -- --port {{port}} --strictPort"
+test = "npm test"
+url = "http://localhost:5173"
+installed = "node_modules"
+ready = "Local:"
+# the dev server the editor's web device runs on a port and host it picks
+serve = "npx vite --port {{port}} --strictPort --host {{host}} --clearScreen false"
+
+# the editor's debug launch: the dev server (task `dragonfly: run`), then the browser with the debugger
+[[toolchain.launch]]
+name = "{{name}} (debug)"
+type = "chrome"
+request = "launch"
+url = "{{url}}"
+webRoot = "{{app}}"
+preLaunchTask = "dragonfly: run"
+
+[project]
+sources = "src"
+# a Dragonfly project has no nuclear.toml: the folder with main.nuc is a web project, built in build/app
+marker = "main.nuc"
+output = "build/app"
+assets = ["public"]
+
+[project.manifest]
+file = "config.nuc"
+sections = ["dragonfly", "app", "plugins", "contracts"]
+
+# the kind of declarations without a header word, by folder
+[project.kinds]
+"components/*/domain/models" = "model"
+"contracts/*/models" = "model"
+"shared/models" = "model"
+"components/*/presentation/*/state_models" = "statemodel"
+"components/*/presentation/state_models" = "statemodel"
+"test" = "tests"
+
+# tests do not go to src/: the app's test/
+[project.outputs]
+"test" = "test"
+
+[project.files."src/dragonfly.g.ts"]
+names = ["startDragonfly", "appRouter", "routes", "dragonflyConfig", "registerDragonfly"]
+template = { file = "templates/dragonfly_g.tpl" }
+
+[project.files."src/index.ts"]
+template = { file = "templates/index_ts.tpl" }
+
+[project.files."index.html"]
+template = { file = "templates/index_html.tpl" }
+
+[project.files."package.json"]
+template = { file = "templates/package_json.tpl" }
+
+# npm copies the runtime (a `file:` dependency) instead of linking it: from a link, TypeScript and Vite resolve its
+# imports (react) next to the runtime's own folder, not the app's, and the types become any and the bundle fails
+[project.files.".npmrc"]
+template = "install-links=true"
+
+[project.files."tsconfig.json"]
+template = { file = "templates/tsconfig.tpl" }
+
+[project.files."vite.config.ts"]
+template = { file = "templates/vite_config.tpl" }
+
+# Log.d/i/s/w/e(...) also receive where they are written (the breadcrumb: component › kind › Class.method)
+[call_site.Log]
+arg = "at"
+text = "{{#component}}{{component}}{{/component}}{{^component}}app{{/component}}{{#kind}} › {{kind}}{{/kind}}{{#module}} › {{module}}{{#method}}.{{method}}{{/method}}{{/module}}{{^module}}{{#method}} › {{method}}{{/method}}{{/module}}{{#path}} · {{path}}.nuc:{{line}}{{/path}}"
+
+[architecture]
+scope = "components"
+# and the screens (@screen): navigation goes from one component to another
+public = ["appcomponent", "model", "event", "component", "guard", "@screen"]
+exempt = ["tests"]
+
+[architecture.callers]
+usecase = ["appcomponent"]
+service = ["usecase", "aggregate"]
+aggregate = ["usecase"]
+repository = ["usecase", "aggregate"]
+
+[auto_imports]
+# the runtime's names: the definitions give the rest; these choose the module when two packages export a name
+"dragonfly-web" = ["Result", "Ok", "Err", "AppError", "inject", "register", "createElement", "Element", "Fragment",
+  "useState", "useEffect", "useMemo", "useRef", "useCallback", "goTo", "pushTo", "goBack", "pathTo"]
+"dragonfly-web/testing" = ["DragonflyTest", "when", "verify", "renderScreen", "statesOf", "okOf", "errOf"]
+"vitest" = ["describe", "test", "it", "expect", "beforeEach", "afterEach", "beforeAll", "afterAll", "vi"]
+"@testing-library/react" = ["screen", "act", "fireEvent", "waitFor", "render", "cleanup"]
+
+# the platform's Error is the runtime's AppError (message, status): Nuclear's `Error(message)` and `e.message`
+[library.Error]
+new = "new AppError({{arg0}})"
+
+[library.error]
+message = "{{recv}}.message"

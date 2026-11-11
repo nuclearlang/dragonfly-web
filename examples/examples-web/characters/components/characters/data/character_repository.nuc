@@ -1,0 +1,19 @@
+// Repository: each method is an http call. The path is appended to the connection's baseUrl;
+// `:id` takes the value of the `id` parameter, and the other parameters go to the query (GET) or the body.
+@repository(path = "character")
+repository CharacterRepository
+  @get(path = ":id")
+  getOne(id: int) Result<CharacterError, Character>
+
+  @get(cache = true, ttl = 600000)
+  getPage(page: int) Result<CharacterError, Page<Character>>
+
+  // the API answers 404 when no character has that name
+  @get
+  search(name: string) Result<CharacterError, Page<Character>>
+
+  @get(path = ":ids")
+  getMany(@path ids: string) Character[]
+
+  @post(retry = 1)
+  save(character: CharacterParams) Result<CharacterError, Character>

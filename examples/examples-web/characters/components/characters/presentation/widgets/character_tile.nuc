@@ -1,0 +1,12 @@
+// A row of the list: the character's picture, name and species; a click opens its detail.
+stateless CharacterTile(character: Character)
+  build() Element
+    li(
+      className = "tile",
+      onClick = () => goTo(CharacterDetailScreen, id = character.id),
+      children = [
+        img(src = character.image, alt = character.name, width = 48),
+        span(className = "name", children = character.name),
+        small(children = character.species),
+      ],
+    )

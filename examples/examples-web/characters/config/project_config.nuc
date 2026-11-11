@@ -1,0 +1,9 @@
+// Global configuration: connections and services of the whole app.
+appConfig ProjectConfig
+  connections: Connection[] = [
+    Http(baseUrl = "https://rickandmortyapi.com/api/", timeout = 5000),
+  ]
+  globals: Global[] = [
+    SessionManager(timeout = 1800000),
+    Acl(inherits = { "admin": ["fan"] }),
+  ]

@@ -1,0 +1,22 @@
+# The contract of the web platform (spec/web.md, ADR-0097): what every dialect of dialects/web/ must implement,
+# identically. The loader refuses a dialect whose kinds, consumed decorators or plugins leave this list.
+# First version (2026-11-06): the kinds of the mobile platform that make sense in a browser, with the same words,
+# so an app's domain reads the same on a phone and on the web. Forms, translations, converters, AI and the local
+# database come in later steps (STATUS.md).
+[platform]
+# the dialect a new project of this platform gets when none is named (`dragonfly new -p <platform>`)
+default_dialect = "react"
+name = "web"
+description = "web apps in the browser through one UI library"
+kinds = [
+  "stateless", "stateful", "appConfig", "config", "repository", "usecase", "appcomponent", "service",
+  "aggregate", "statemanager", "statemodel", "model", "component", "guard", "event", "tests",
+]
+# the decorators a project may write (a dialect consumes them in its templates or writes them as the target's)
+decorators = [
+  "repository", "get", "post", "put", "patch", "delete", "path", "query", "body",
+  "stateModel", "state", "before", "after", "screen", "on", "requires", "acl",
+  "mock", "test", "widget", "states",
+  "key",
+]
+plugins = []
