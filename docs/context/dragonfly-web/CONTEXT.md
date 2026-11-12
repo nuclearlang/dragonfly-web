@@ -35,6 +35,7 @@ as one object in a dialect with `named_args = "object"`.
 | `examples/examples-web/characters/` | the complete example (golden `examples/expected/characters`): list and detail screens, state, tests |
 | `tools/react-check/check.sh` | runtime tsc, example built, tsc --strict, vitest (4 tests), vite build, runtime tests |
 | `spec/web.md`, `spec/react.md` | the platform; the dialect (3 equivalences checked by `tools/spec-check/check.py spec/react.md react typescript`) |
+| `spec/brief/react.md` | the short sheet for agents (`nuclear spec --brief --dialect react`; the code compiles with the dialect) |
 | `docs/dragonfly/react.md` | the user guide (website) |
 
 Type definitions `defs/typescript/{react@19.3.1, react_router@7.18.5, vitest@4.1.12, testing_library_react@16.3.3,
@@ -48,7 +49,8 @@ public API (the command is in `tools/defs/typescript/generate.sh`'s style; the f
 
 `dragonfly new <name> -p web -d react` writes the skeleton (`dragonfly/dragonfly/src/scaffold.rs`, `web_project`); `build`,
 `install`, `run` and `test` go through the dialect's `[toolchain]` and `check` runs `nuclear check .`, as for backend
-projects (`non_mobile_manifest` in `dragonfly/dragonfly/src/main.rs`; [cli CONTEXT](https://github.com/nuclearlang/dragonfly/blob/main/docs/context/cli/CONTEXT.md)).
+projects; `dragonfly gen resource` writes a resource's models, repository, use cases, view and tests from the
+`[[generators.*]]` of `dialects/web/platform.toml` (ADR-0103) (`non_mobile_manifest` in `dragonfly/dragonfly/src/main.rs`; [cli CONTEXT](https://github.com/nuclearlang/dragonfly/blob/main/docs/context/cli/CONTEXT.md)).
 
 ## Checks
 

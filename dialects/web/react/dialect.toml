@@ -117,6 +117,7 @@ description = "@repository(path, connection) repository Name + @get/@post/... me
 inherits = ["Repository"]
 imports = ["Repository", "HttpMethod", "Decode", "Cache"]
 async_methods = true
+method_members = ["purge{{name|pascal}}"]
 template = { file = "templates/repository.tpl" }
 [kinds.repository.syntax]
 method_signature = { file = "templates/repository_method.tpl" }
@@ -133,6 +134,7 @@ ctor_param = "{{decorators}}private readonly {{name}}{{#optional}}?{{/optional}}
 method = { file = "templates/usecase_method.tpl" }
 
 [kinds.appcomponent]
+needs_body = true
 description = "appcomponent Name + aliases to use cases (getOne() = GetOneUseCase.exec) → the facade of a component"
 imports = ["inject"]
 alias_via = "inject"

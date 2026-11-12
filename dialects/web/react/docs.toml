@@ -4,7 +4,7 @@
 [kinds]
 
 stateless = '''
-A **React component** without state of its own: its parameters are the props, `build()` returns the elements.
+A **view** without state of its own: its parameters are its inputs, `build()` returns the elements.
 
 ```nuclear
 stateless CharacterTile(character: Character)
@@ -23,7 +23,7 @@ stateless CharacterTile(character: Character)
 '''
 
 stateful = '''
-A **React component with state**: its fields live while the component is shown; `setState(() => ...)` changes
+A **view with state**: its fields live while the view is shown; `setState(() => ...)` changes
 them and re-renders. `initState()` runs once when it is shown, `dispose()` when it leaves.
 
 ```nuclear
@@ -207,7 +207,7 @@ component ForceLogoutComponent
 '''
 
 guard = '''
-A **custom access check** (in `shared/guards/`), like NestJS `CanActivate`: `canActivate()` says whether the
+A **custom access check** (in `shared/guards/`): `canActivate()` says whether the
 caller may go on; used in `@acl(guards = [Name])`.
 
 ```nuclear
@@ -499,3 +499,10 @@ Character
   originName: string
 ```
 '''
+
+# What the react dialect writes underneath each word (its framework): the editor and `nuclear help` show it
+# after the word; the local agents never read it (they write only Nuclear).
+
+[underneath.kinds]
+stateless = 'a React function component: its parameters are the props.'
+stateful = 'a React component with state: `setState(() => ...)` re-renders it.'

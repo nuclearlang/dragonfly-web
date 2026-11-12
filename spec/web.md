@@ -134,6 +134,21 @@ one; a view calls `useEvent(Name)` in `build` to re-render on it.
 `SessionManager` keeps the session (token, user, roles, permissions, values) in the browser's storage and ends it
 after `timeout`; `Acl` gives role inheritance; a `guard` is a custom check for `@acl(guards = [...])`.
 
+### Generators
+
+`dragonfly gen resource <component> <Name>` writes the finished, compiling code of a resource (ADR-0103): its models
+(nested objects become models named `<Name><Key>`; a paged answer gives `<Name>Page`), the repository (an HTTP repository over the app's `Http` connection, a named one added when the app has another), one use
+case per action (`--actions list,get,search,create,update,delete`), their aliases in the facade, with `--screen <screen>` a screen that lists it with its state manager and state model, and a test with the repository mocked. The fields
+come from an example answer (`--from-json <file|url>`), a spec (`--from-spec <spec.md>`: its example answer, else its
+`Key | Type` table; a `GET https://...` line gives the API) or `--fields "id:int name:string"`. A file that exists is
+never overwritten (the facade gets only the missing aliases); a name another file declares stops it before it writes.
+`dragonfly gen inspect` answers what the project has. The agent writes only what is not standard: a use case with
+its own rules, a view's details.
+
+```sh
+dragonfly gen resource characters Character --from-json https://rickandmortyapi.com/api/character
+```
+
 ## 4. Tests
 
 `tests` in `test/`: the app starts with its real config and every request answers what the test prepares
